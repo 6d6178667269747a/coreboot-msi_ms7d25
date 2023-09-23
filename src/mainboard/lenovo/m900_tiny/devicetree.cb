@@ -168,9 +168,6 @@ chip soc/intel/skylake
 				end
 				device pnp 4e.f off end		# Function register
 			end
-			chip drivers/pc80/tpm
-				device pnp 4e.0 on end  # TPM module
-			end
 		end # LPC Interface
 		device pci 1f.1 on  end # P2SB
 		device pci 1f.2 on  end # Power Management Controller
@@ -180,5 +177,9 @@ chip soc/intel/skylake
 		device pci 1f.4 on  end # SMBus
 		device pci 1f.5 off end # PCH SPI
 		device pci 1f.6 on  end # GbE
+
+		chip drivers/crb
+			device mmio 0xfed40000 on end
+		end
 	end
 end
