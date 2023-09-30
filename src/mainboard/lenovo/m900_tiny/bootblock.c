@@ -7,8 +7,8 @@
 #include <superio/nuvoton/nct6687d/nct6687d.h>
 #include "include/gpio.h"
 
-#define SERIAL_DEV PNP_DEV(0x4e, NCT6687D_SP1)
-#define POWER_DEV PNP_DEV(0x4e, NCT6687D_SLEEP_PWR)
+#define SERIAL_DEV PNP_DEV(0x2e, NCT6687D_SP1)
+#define POWER_DEV PNP_DEV(0x2e, NCT6687D_SLEEP_PWR)
 
 void bootblock_mainboard_early_init(void)
 {
@@ -31,4 +31,7 @@ void bootblock_mainboard_early_init(void)
 	pnp_write_config(POWER_DEV, 0xf3, 0x0c);
 
 	nuvoton_pnp_exit_conf_state(POWER_DEV);
+
+	if (CONFIG(CONSOLE_SERIAL))
+		nuvoton_enable_serial(SERIAL_DEV, CONFIG_TTYS0_BASE);
 }
