@@ -17,6 +17,14 @@ Method (PGPM, 1, Serialized)
 Method (MPTS, 1, Serialized)
 {
 	PGPM (MISCCFG_GPIO_PM_CONFIG_BITS)
+
+	/* Bring system out of TC cold before enter Sx */
+
+	\_SB.PCI0.TCON ()
+
+	/* Bring TBT group 0 and 1 out of D3 cold if it is in D3 cold */
+	\_SB.PCI0.TG0N ()
+	\_SB.PCI0.TG1N ()
 }
 
 /*
