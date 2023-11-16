@@ -54,14 +54,35 @@ Field (PXCS, AnyAcc, NoLock, WriteAsZeros)
 /*
  * _DSM Device Specific Method
  *
- * Arg0: UUID Unique function identifier
- * Arg1: Integer Revision Level
- * Arg2: Integer Function Index (0 = Return Supported Functions)
- * Arg3: Package Parameters
+ * Arg0: UUID: E5C937D0-3553-4d7a-9117-EA4D19C3434D
+ * Arg1: Revision ID: 3
+ * Arg2: Function index: 0, 9
+ * Arg3: Empty package
  */
 Method (_DSM, 4, Serialized)
 {
-	Return (Buffer() { 0x00 })
+	If (Arg0 == ToUUID("E5C937D0-3553-4d7a-9117-EA4D19C3434D")) {
+		If (Arg1 >= 3) {
+			If (Arg2 == 0) {
+				/*
+				* Function index: 0
+				* Standard query - A bitmask of functions supported
+				*/
+				CreateBitField(OPTS, 9, FUN9)
+				FUN9 = 1
+				Return (OPTS)
+			} ElseIf (Arg2 == 9) {
+				/*
+				* Function index: 9
+				* Specifying device readiness durations
+				*/
+				Return (Package() { FW_RESET_TIME, FW_DL_UP_TIME,
+						FW_FLR_RESET_TIME, FW_D3HOT_TO_D0_TIME,
+						FW_VF_ENABLE_TIME })
+			}
+		}
+	}
+	Return (Buffer() { 0x0 })
 }
 
 /*
@@ -72,40 +93,6 @@ Name(OPTS, Buffer(2) {0, 0})
 Device (PXSX)
 {
 	Name (_ADR, 0x00000000)
-
-	/*
-	 * _DSM Device Specific Method
-	 *
-	 * Arg0: UUID: E5C937D0-3553-4d7a-9117-EA4D19C3434D
-	 * Arg1: Revision ID: 3
-	 * Arg2: Function index: 0, 9
-	 * Arg3: Empty package
-	 */
-	Method (_DSM, 4, Serialized)
-	{
-		If (Arg0 == ToUUID("E5C937D0-3553-4d7a-9117-EA4D19C3434D")) {
-			If (Arg1 >= 3) {
-				If (Arg2 == 0) {
-					/*
-					 * Function index: 0
-					 * Standard query - A bitmask of functions supported
-					 */
-					CreateBitField(OPTS, 9, FUN9)
-					FUN9 = 1
-					Return (OPTS)
-				} ElseIf (Arg2 == 9) {
-					/*
-					 * Function index: 9
-					 * Specifying device readiness durations
-					 */
-					Return (Package() { FW_RESET_TIME, FW_DL_UP_TIME,
-							FW_FLR_RESET_TIME, FW_D3HOT_TO_D0_TIME,
-							FW_VF_ENABLE_TIME })
-				}
-			}
-		}
-		Return (Buffer() { 0x0 })
-	}
 
 	Method (_PRW, 0)
 	{
@@ -183,6 +170,20 @@ Method (D3CX, 0, Serialized)
 		Local1 = L23R
 	}
 	STAT = 0x1
+
+	/*
+	 * Wait for LA = 1
+	 */
+	Local0 = 0
+	Local1 = LASX
+	While(Local1 == 0) {
+		If (Local0 > 20) {
+			Break
+		}
+		Sleep(5)
+		Local0++
+		Local1 = LASX
+	}
 }
 
 /*
@@ -222,6 +223,29 @@ Method (_PS0, 0, Serialized)
 	HPME ()  /* Check and handle PME SCI status */
 	If (PMEX == 1) {
 		PMEX = 0  /* Disable Power Management SCI */
+	}
+	Sleep(100) /* Wait for 100ms before return to OS starts any DS activities */
+
+	If ((TUID == 0) || (TUID == 1)) {
+		If (\_SB.PCI0.TDM0.WACT == 1) {
+			\_SB.PCI0.TDM0.WACT = 2 /* Indicate other thread's _PS0 to wait the response */
+			\_SB.PCI0.TDM0.WFCC (5000) /* Wait for command complete */
+			\_SB.PCI0.TDM0.WACT = 0
+		} ElseIf (\_SB.PCI0.TDM0.WACT == 2) {
+			While (\_SB.PCI0.TDM0.WACT != 0) {
+				Sleep (5)
+			}
+		}
+	} Else {
+		If (\_SB.PCI0.TDM1.WACT == 1) {
+			\_SB.PCI0.TDM1.WACT = 2 /* Indicate other thread's _PS0 to wait the response */
+			\_SB.PCI0.TDM1.WFCC (5000) /* Wait for command complete */
+			\_SB.PCI0.TDM1.WACT = 0
+		} ElseIf (\_SB.PCI0.TDM1.WACT == 2) {
+			While (\_SB.PCI0.TDM1.WACT != 0) {
+				Sleep (5)
+			}
+		}
 	}
 }
 
@@ -294,4 +318,21 @@ Method (HPME, 0, Serialized)
 		Return (0x01)
 	}
 	Return (0x00)
+}
+
+Name (IQAA, Package () {
+	Package () { 0x0000ffff, 0, 0, 16 },
+	Package () { 0x0000ffff, 1, 0, 17 },
+	Package () { 0x0000ffff, 2, 0, 18 },
+	Package () { 0x0000ffff, 3, 0, 19 } })
+
+Name (IQAP, Package () {
+	Package () { 0x0000ffff, 0, 0, 11 },
+	Package () { 0x0000ffff, 1, 0, 10 },
+	Package () { 0x0000ffff, 2, 0, 11 },
+	Package () { 0x0000ffff, 3, 0, 11 } })
+
+Method(_PRT,0)
+{
+	Return(IRQM(1))
 }

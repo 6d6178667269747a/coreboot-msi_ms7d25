@@ -33,6 +33,7 @@ Method (MPTS, 1, Serialized)
 Method (MWAK, 1, Serialized)
 {
 	PGPM (0)
+	\_SB.PCI0.TCWK(Arg0)
 }
 
 /*

@@ -185,4 +185,16 @@ Device (RHUB)
 			})
 		}
 	}
+
+	Method(_PS0, 0, Serialized)
+	{
+	}
+
+	Method(_PS2, 0, Serialized)
+	{
+	}
+
+	Method(_PS3, 0, Serialized)
+	{
+	}
 }

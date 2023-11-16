@@ -514,6 +514,9 @@ Scope (\_SB.PCI0)
 	OperationRegion (IOMR, SystemMemory, (IOMA() + 0xC10000), 0x100)
 	Field (IOMR, DWordAcc, NoLock, Preserve)
 	{
+		Offset(0x14),
+		,     30,
+		ITIM, 1,
 		Offset(0x40),
 		,     15,
 		TD3C, 1,          /* [15:15] Type C D3 cold bit */
@@ -524,6 +527,17 @@ Scope (\_SB.PCI0)
 		IMCD, 32,         /* R_SA_IOM_BIOS_MAIL_BOX_CMD */
 		IMDA, 32          /* R_SA_IOM_BIOS_MAIL_BOX_DATA */
 	}
+
+	/*
+	 * Below is a variable to store devices connect state for TBT PCIe RP before enter D3 cold
+	 *
+	 * Value 0 - no device connected before enter D3 cold
+	 *           no need to send CONNECT_TOPOLOGY in D3 cold exit
+	 *       1 - has device connected before enter D3 cold
+	 *           need to send CONNECT_TOPOLOGY in D3 cold exit.
+	 */
+	Name(CTP0, 0) /* Variable of device connected status for TBT0 group */
+	Name(CTP1, 0) /* Variable of device connected status for TBT1 group */
 
 	/*
 	 * TBT Group0 ON method
@@ -545,6 +559,18 @@ Scope (\_SB.PCI0)
 				If (\_SB.PCI0.TRP1.VDID != 0xFFFFFFFF) {
 					/* RP1 D3 cold exit. */
 					\_SB.PCI0.TRP1.D3CX()
+				}
+				/*
+				 * Need to send Connect-Topology command when
+				 * TBT host controller back to D0 from D3
+				 */
+				If (\_SB.PCI0.TDM0.ALCT == 1) {
+					If (CTP0 == 1) {
+						\_SB.PCI0.TDM0.CNTP() /* Send Connect-Topology command if there is device present on PCIe RP */
+						\_SB.PCI0.TDM0.WACT = 1 /* Indicate to wait Connect-Topology cmd */
+						CTP0 = 0 /* Clear the connect states */
+					}
+					\_SB.PCI0.TDM0.ALCT = 0	/* Disallow to send Connect-Topology cmd */
 				}
 			} Else {
 				Printf("Drop TG0N due to it is already exit D3 cold.")
@@ -569,10 +595,16 @@ Scope (\_SB.PCI0)
 
 				Printf("Push TBT RPs to D3Cold together")
 				If (\_SB.PCI0.TRP0.VDID != 0xFFFFFFFF) {
+					If (\_SB.PCI0.TRP0.PDSX == 1) {
+						CTP0 = 1
+					}
 					/* Put RP0 to D3 cold. */
 					\_SB.PCI0.TRP0.D3CE()
 				}
 				If (\_SB.PCI0.TRP1.VDID != 0xFFFFFFFF) {
+					If (\_SB.PCI0.TRP1.PDSX == 1) {
+						CTP0 = 1
+					}
 					/* Put RP1 to D3 cold. */
 					\_SB.PCI0.TRP1.D3CE()
 				}
@@ -601,6 +633,18 @@ Scope (\_SB.PCI0)
 					/* RP3 D3 cold exit. */
 					\_SB.PCI0.TRP3.D3CX()
 				}
+				/*
+				 * Need to send Connect-Topology command when
+				 * TBT host controller back to D0 from D3
+				 */
+				If (\_SB.PCI0.TDM1.ALCT == 1) {
+					If (CTP1 == 1) {
+						\_SB.PCI0.TDM1.CNTP() /* Send Connect-Topology command if there is device present on PCIe RP */
+						\_SB.PCI0.TDM1.WACT = 1 /* Indicate to wait Connect-Topology cmd */
+						CTP1 = 0 /* Clear the connect states */
+					}
+					\_SB.PCI0.TDM1.ALCT = 0	/* Disallow to send Connect-Topology cmd */
+				}
 			} Else {
 				Printf("Drop TG1N due to it is already exit D3 cold.")
 			}
@@ -624,10 +668,16 @@ Scope (\_SB.PCI0)
 
 				Printf("Push TBT RPs to D3Cold together")
 				If (\_SB.PCI0.TRP2.VDID != 0xFFFFFFFF) {
+					If (\_SB.PCI0.TRP2.PDSX == 1) {
+						CTP1 = 1
+					}
 					/* Put RP2 to D3 cold. */
 					\_SB.PCI0.TRP2.D3CE()
 				}
 				If (\_SB.PCI0.TRP3.VDID != 0xFFFFFFFF) {
+					If (\_SB.PCI0.TRP3.PDSX == 1) {
+						CTP1 = 1
+					}
 					/* Put RP3 to D3 cold */
 					\_SB.PCI0.TRP3.D3CE()
 				}
@@ -787,7 +837,7 @@ Scope (\_SB.PCI0)
 				STAT = 0
 			}
 		}
-	} // S0IX == 1
+	} /* S0IX == 1 */
 
 	/*
 	 * TCSS xHCI device
@@ -830,6 +880,7 @@ Scope (\_SB.PCI0)
 			}
 		}
 		#include "tcss_dma.asl"
+		#include "tcss_mailbox.asl"
 	}
 
 	/*
@@ -852,6 +903,7 @@ Scope (\_SB.PCI0)
 			}
 		}
 		#include "tcss_dma.asl"
+		#include "tcss_mailbox.asl"
 	}
 
 	/*
@@ -972,5 +1024,38 @@ Scope (\_SB.PCI0)
 			LNSL = 0x88C8
 		}
 		#include "tcss_pcierp.asl"
+	}
+
+	/* TCSS wake */
+	Method(TCWK, 1) {
+		If ((Arg0 == 3) || (Arg0 == 4)) {
+			If(\_SB.PCI0.TRP0.VDID != 0xFFFFFFFF) {
+				Notify (\_SB.PCI0.TRP0, 0)
+			}
+			If(\_SB.PCI0.TRP1.VDID != 0xFFFFFFFF) {
+				Notify (\_SB.PCI0.TRP1, 0)
+			}
+			If(\_SB.PCI0.TRP2.VDID != 0xFFFFFFFF) {
+				Notify (\_SB.PCI0.TRP2, 0)
+			}
+			If(\_SB.PCI0.TRP3.VDID != 0xFFFFFFFF) {
+				Notify (\_SB.PCI0.TRP3, 0)
+			}
+		}
+	}
+}
+
+If (S0IX == 1) {
+	Scope (\_SB.PCI0.GFX0)
+	{
+		Name(_S3D, 3)
+
+		Method (_PS0, 0, Serialized)
+		{
+		}
+
+		Method (_PS3, 0, Serialized)
+		{
+		}
 	}
 }
