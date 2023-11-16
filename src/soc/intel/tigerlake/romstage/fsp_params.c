@@ -26,8 +26,8 @@ static void soc_memory_init_params(FSP_M_CONFIG *m_cfg,
 
 	m_cfg->InternalGfx = !CONFIG(SOC_INTEL_DISABLE_IGD) && is_devfn_enabled(SA_DEVFN_IGD);
 
-	/* If IGD is enabled, set IGD stolen size to 60MB. Otherwise, skip IGD init in FSP */
-	m_cfg->IgdDvmt50PreAlloc = m_cfg->InternalGfx ? 0xFE : 0;
+	/* If IGD is enabled, set IGD stolen size to 128MB. Otherwise, skip IGD init in FSP */
+	m_cfg->IgdDvmt50PreAlloc = m_cfg->InternalGfx ? 0x04 : 0;
 
 	m_cfg->TsegSize = CONFIG_SMM_TSEG_SIZE;
 	m_cfg->IedSize = CONFIG_IED_REGION_SIZE;
