@@ -286,6 +286,24 @@ config EDK2_IPXE_OPTION_NAME
 	  of EDK2 Payload. This name will be passed as PCD to the EDK2 build
 	  system.
 
+config EDK2_ENABLE_MEMTEST
+	bool "Include Memtest86+ in edk2 payload"
+	default n
+	select MEMTEST_SECONDARY_PAYLOAD
+	help
+	  Instructs coreboot build system to build Memtest86+ and include it in
+	  the EDK2 payload.
+
+if EDK2_ENABLE_MEMTEST
+
+config MEMTEST86PLUS_V6
+	default y
+
+config MEMTEST86PLUS_ARCH_64
+	default y
+
+endif
+
 config EDK2_SECURE_BOOT
 	bool "Enable UEFI Secure Boot"
 	depends on SMMSTORE_V2
